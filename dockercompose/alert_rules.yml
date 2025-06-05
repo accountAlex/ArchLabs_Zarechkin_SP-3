@@ -1,0 +1,26 @@
+groups:
+- name: cpu-and-requests
+  rules:
+  - alert: HighCPUContainer
+    expr: process_cpu_seconds_total{job="user-service"} > 90
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "User-service ест >90 % CPU 2 мин"
+  - alert: SlowUserAPI
+    expr: rate(api_user_request_seconds_sum[5m])
+          /
+          rate(api_user_request_seconds_count[5m]) > 2
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "95-й перцентиль /users >2 с"
+  - alert: BurstRegistrations
+    expr: increase(users_created_total[5m]) > 10
+    for: 30s
+    labels:
+      severity: info
+    annotations:
+      summary: "Создано >10 юзеров за 5 мин"

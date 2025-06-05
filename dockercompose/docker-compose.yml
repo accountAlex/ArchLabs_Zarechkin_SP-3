@@ -1,0 +1,157 @@
+
+services:
+  postgres:
+    image: postgres:13.3
+    container_name: postgres-archapp
+    environment:
+      POSTGRES_DB      : arch
+      POSTGRES_USER    : postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA           : /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"              # host:container
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  keydb:
+    image: eqalpha/keydb:arm64_v5.3.3
+    container_name: keydb-archapp
+    command: "keydb-server /etc/keydb/redis.conf --server-threads 2"
+    ports:
+      - "6379:6379"
+    volumes:
+      - keydbdata:/data
+    restart: unless-stopped
+
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - "9121:9121"
+    command:
+      - --redis.addr=redis://keydb:6379/0
+    depends_on:
+      - keydb
+
+
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-archapp
+    ports:
+      - "5672:5672"      # AMQP
+      - "15672:15672"    # Web-UI
+      - "15692:15692"    # Prometheus metrics
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_prometheus true"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus-archapp
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana-archapp
+    ports:
+      - "3003:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager-archapp
+    ports:
+      - "9093:9093"
+    environment:           
+      BOT_TOKEN: "7331270880:AAF5feulXp-4Fpbw_KDNVfddjyDMl6HKdIc"
+      CHAT_ID  : "-1002665495427"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    restart: unless-stopped
+
+  axonserver:
+    image: axoniq/axonserver
+    container_name: axonserver-archapp
+    ports:
+      - "8024:8024"   # Web
+      - "8124:8124"   # gRPC
+    volumes:
+      - axonserverdata:/data
+    restart: unless-stopped
+
+
+
+  user-service:
+    build:
+      context   : ../apps/user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports: ["3000:3000"]
+    depends_on:
+      - postgres
+      - keydb
+      - rabbitmq
+    environment:
+      PORT: 3000
+    
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: arch
+
+      REDIS_HOST: keydb
+      REDIS_PORT: 6379
+      CACHE_TTL : 60
+
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      RABBITMQ_QUEUE: user.events  
+    expose:
+      - "3000"    
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context   : ../apps/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports: ["3001:3001"]
+    depends_on:
+      - rabbitmq
+    environment:
+      PORT: 3001
+
+      RABBITMQ_HOST : rabbitmq
+      RABBITMQ_PORT : 5672
+      RABBITMQ_USER : guest
+      RABBITMQ_PASS : guest
+      RABBITMQ_QUEUE: user.events
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  keydbdata:
+  rabbitmqdata:
+  grafana-data:
+  axonserverdata:
+  

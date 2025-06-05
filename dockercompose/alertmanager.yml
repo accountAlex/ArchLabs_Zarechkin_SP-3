@@ -1,0 +1,20 @@
+route:
+  receiver: 'telegram'   
+
+receivers:
+  - name: telegram    
+    telegram_configs:
+      - bot_token: "7331270880:AAF5feulXp-4Fpbw_KDNVfddjyDMl6HKdIc"
+        chat_id: -1002665495427
+        parse_mode: Markdown
+        message: |
+          🚨 *{{ .CommonLabels.alertname }}* ({{ .CommonLabels.severity }})
+
+          {{- range .Alerts }}
+          • *{{ .Labels.severity }}* — {{ .Annotations.summary }}
+          {{- if .Annotations.description }}
+          _Описание_: {{ .Annotations.description }}
+          {{- end }}
+          _Инстанс_: `{{ .Labels.instance }}`
+          _Время_: {{ .StartsAt }}
+          {{- end }}
