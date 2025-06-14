@@ -6,7 +6,7 @@ docker compose logs -f user-service
 
 POST http://localhost:3000/users \
   -H "Content-Type: application/json" \
-  -d '{"name":"Иван Иванов","email":"ivan@exaccmple.com"}'
+  -d '{"name":"Иван Иванов","email":"alex@misis.ru"}'
 
 curl -i http://localhost:3000/users/{id}
 
